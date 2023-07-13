@@ -43,14 +43,14 @@ namespace Crawl2Excel.Test
 			Index = 0,
 			Mandatory = true,
 			Example = "pm0",
-			Description = "The URL of the website where the crawl begins."
+			Description = "This is the description of the first parameter."
 		)]
 		public required string Parameter0 { get; set; }
 
 		[CommandLineParameter(
 			Index = 1,
 			Example = "pm1",
-			Description = "The full name of the Excel file with the results that the crawler will create, if omitted excel file will be created in current directory."
+			Description = "This is the description of the second parameter."
 		)]
 		public string? Parameter1 { get; set; }
 
