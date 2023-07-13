@@ -1,7 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
     <TargetFramework>net7.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -9,10 +8,6 @@
 
   <ItemGroup>
     <PackageReference Include="Abot" Version="2.0.70" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Crawl2Excel.Engine\Crawl2Excel.Engine.csproj" />
   </ItemGroup>
 
 </Project>
