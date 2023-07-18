@@ -7,7 +7,7 @@ namespace Crawl2Excel.Test
 	public class CommandLineParserTest
 	{
 		[TestMethod]
-		public void ParseTest1()
+		public void ParseTest_01()
 		{
 			var pms = CreateParameters("pm0 pm1 -mu -gaa -go_crazy");
 			Assert.IsNotNull(pms);
@@ -20,7 +20,7 @@ namespace Crawl2Excel.Test
 		}
 
 		[TestMethod]
-		public void ParseTest2()
+		public void ParseTest_02()
 		{
 			var pms = CreateParameters("pm0 -gaa -go_crazy");
 			Assert.IsNotNull(pms);
@@ -31,9 +31,25 @@ namespace Crawl2Excel.Test
 			Assert.IsTrue(pms.Switches.Contains("go_crazy"));
 		}
 
+		[TestMethod]
+		public void ParseErrorTest_01()
+		{
+			var pms = CreateParameters("-gaa -go_crazy");
+			Assert.IsNotNull(pms);
+			Assert.IsFalse(pms.ParametersValid);
+		}
+
+		[TestMethod]
+		public void ParseErrorTest_02()
+		{
+			var pms = CreateParameters("");
+			Assert.IsNotNull(pms);
+			Assert.IsFalse(pms.ParametersValid);
+		}
+
 		private TestCmdLineParameters CreateParameters(string commandLine)
 		{
-			return CommandLineParser.Parse<TestCmdLineParameters>(commandLine.Split(' '));
+			return CommandLineParser.Parse<TestCmdLineParameters>(commandLine?.Split(' ') ?? new string[0]);
 		}
 	}
 
