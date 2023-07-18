@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Crawl2Excel": {
+      "commandName": "Project",
+      "commandLineArgs": "https://www.antoniob.com -owr -le"
+    }
+  }
+}

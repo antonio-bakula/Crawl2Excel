@@ -88,7 +88,28 @@ namespace Crawl2Excel.Engine
 
 		protected IEnumerable<string> GetParametersDescription()
 		{
-			return new List<string>();
+			var desc = new List<string>();
+			Type resultType = GetType();
+			var allParameters = resultType.GetProperties()
+				.Where(p => p.GetCustomAttribute<CommandLineParameterAttribute>() != null)
+				.Select(p => new
+				{
+					Property = p,
+					Attribute = p.GetCustomAttribute<CommandLineParameterAttribute>()
+				});
+
+			foreach (var param in allParameters)
+			{
+				if (param.Attribute?.Mandatory ?? false)
+				{
+					desc.Add($"<{param.Property.Name}> - {param.Attribute?.Description} **Mandatory parameter**. Example: {param.Attribute?.Example}");
+				}
+				else
+				{
+					desc.Add($"[{param.Property.Name}] - {param.Attribute?.Description} Example: {param.Attribute?.Example}");
+				}
+			}
+			return desc;
 		}
 
 	}

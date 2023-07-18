@@ -20,7 +20,7 @@ if (!parameters.ParametersValid)
 		Console.WriteLine(error);
 	}
 	Console.WriteLine("");
-	Console.WriteLine("See help with switch -help - Crawl2Excel -help ");
+	Console.WriteLine("See help with switch -help (Crawl2Excel -help)");
 	return 0;
 }
 

@@ -20,13 +20,13 @@ namespace Crawl2Excel
 		[CommandLineParameter(
 			Index = 1, 
 			Example = "c:\\temp\\antoniob-crawl-results.xlsx",
-			Description = "The full name of the Excel file with the results that the crawler will create, if omitted excel file will be created in current directory."
+			Description = "The Excel file with the results that the crawler will create, if omitted excel file will be created in current directory."
 		)]
 		public string? ExcelFileName { get; set; }
 
 		public override void CheckParsedParameters()
 		{
-			if (!Uri.IsWellFormedUriString(this.CrawlStartUrl, UriKind.Absolute))
+			if (!string.IsNullOrEmpty(this.CrawlStartUrl) && !Uri.IsWellFormedUriString(this.CrawlStartUrl, UriKind.Absolute))
 			{
 				ParsingErrors.Add($"CrawlStartUrl error, {this.CrawlStartUrl} is not valid URI");
 			}
@@ -50,7 +50,9 @@ namespace Crawl2Excel
 			result.Add("");
 
 			result.Add("Usage examples:");
-			result.Add("");
+			result.Add("Crawl2Excel https://www.antoniob.com -owr -le");
+			result.Add("Crawl2Excel https://www.antoniob.com antoniob.xlsx -owr -le");
+			result.Add("Crawl2Excel https://www.antoniob.com c:\\temp\\antoniob.xlsx");
 
 			return result;
 		}

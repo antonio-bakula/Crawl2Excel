@@ -32,6 +32,14 @@ namespace Crawl2Excel.Test
 		}
 
 		[TestMethod]
+		public void ParseTest_03()
+		{
+			var pms = CreateParameters("-help");
+			Assert.IsNotNull(pms);
+			Assert.IsTrue(pms.Switches.Contains("help"));
+		}
+
+		[TestMethod]
 		public void ParseErrorTest_01()
 		{
 			var pms = CreateParameters("-gaa -go_crazy");
