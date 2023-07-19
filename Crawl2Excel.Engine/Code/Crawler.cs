@@ -105,18 +105,14 @@ namespace Crawl2Excel.Engine.Code
 			AddCrawlResult(result);
 		}
 
-		private readonly object _consoleLock = new object();
 		private void Crawler_PageCrawlCompleted(object? sender, PageCrawlCompletedArgs e)
 		{
 			if (e.CrawledPage != null)
 			{
 				//Parallel.Invoke(() => StoreCrawlData(e.CrawledPage));
 				StoreCrawlData(e.CrawledPage);
-				lock (_consoleLock)
-				{
-					Console.SetCursorPosition(0, 2);
-					Console.WriteLine($"Pages Crawled: {e.CrawlContext.CrawledCount}");
-				}
+				Console.SetCursorPosition(0, 2);
+				Console.WriteLine($"Pages Crawled: {crawledPages.Count}");
 			}
 		}
 
@@ -179,30 +175,20 @@ namespace Crawl2Excel.Engine.Code
 			AddCrawlResult(result);
 		}
 
-		private static readonly object _flushLock = new object();
-		
 		private void AddCrawlResult(CrawledPageResult result)
 		{
 			pages.Add(result);
-			lock (_consoleLock)
-			{
-				Console.SetCursorPosition(0, 3);
-				Console.WriteLine($"Pages in buffer: {pages.Count}    ");
-			}
 
-			lock (_flushLock)
+			int takePages = 1000;
+			if (pages.Count > takePages)
 			{
-				int takePages = 500;
-				if (pages.Count > takePages)
+				var storeResults = new List<CrawledPageResult>();
+				for (int i = 0; i < takePages; i++)
 				{
-					var storeResults = new List<CrawledPageResult>();
-					for (int i = 0; i < takePages; i++)
-					{
-						storeResults.Add(pages.Take());
-					}
-					//Parallel.Invoke(() => WriteResultsToExcel(storeResults));
-					WriteResultsToExcel(storeResults);
+					storeResults.Add(pages.Take());
 				}
+				//Parallel.Invoke(() => WriteResultsToExcel(storeResults));
+				WriteResultsToExcel(storeResults);
 			}
 		}
 

@@ -1,7 +1,10 @@
 ﻿using Crawl2Excel;
 using Crawl2Excel.Engine;
 using Crawl2Excel.Engine.Code;
+using System.Diagnostics;
 
+var sw = new Stopwatch();
+sw.Start();
 var parameters = CommandLineParser.Parse<CmdLineParameters>(args);
 if (parameters.Switches.Contains("help"))
 {
@@ -28,6 +31,8 @@ var crawler = new Crawler(parameters.CrawlStartUrl, parameters.ExcelFileName);
 crawler.Options.OverwriteResultExcelIfExists = parameters.Switches.Contains("owr");
 crawler.Options.LaunchExcelWhenFinished = parameters.Switches.Contains("le");
 await crawler.Start();
+sw.Stop();
+Console.WriteLine(sw.Elapsed);
 return 1;
 
 
