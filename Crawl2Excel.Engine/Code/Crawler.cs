@@ -192,7 +192,7 @@ namespace Crawl2Excel.Engine.Code
 
 			lock (_flushLock)
 			{
-				int takePages = 20;
+				int takePages = 500;
 				if (pages.Count > takePages)
 				{
 					var storeResults = new List<CrawledPageResult>();
