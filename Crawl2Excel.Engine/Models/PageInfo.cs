@@ -7,6 +7,7 @@ namespace Crawl2Excel.Engine.Models
 	{
 		public string? Charset { get; set; }
 		public string? Lang { get; set; }
+		public string? ContentType { get; set; }
 	}
 
 	public class PageSeoInfo

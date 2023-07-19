@@ -19,6 +19,7 @@ namespace Crawl2Excel.Engine.Code
 			var info = new PageInfo();
 			info.Charset = page.AngleSharpHtmlDocument.CharacterSet;
 			info.Lang = page.AngleSharpHtmlDocument.Head.Language;
+			info.ContentType = page.AngleSharpHtmlDocument.ContentType;
 			return info;
 		}
 

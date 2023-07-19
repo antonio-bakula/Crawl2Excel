@@ -20,67 +20,66 @@ namespace Crawl2Excel.Engine.Code
 		}
 
 		public void WriteResults(List<CrawledPageResult> results)
-		{			
-			SLDocument excel;
+		{
 			int row = 1;
+			file.Refresh();
 			if (!file.Exists)
 			{
-				excel = new SLDocument();
-				excel.AddWorksheet("CrawlResults");
-				var headerStyle = excel.CreateStyle();
-				headerStyle.Font.Bold = true;
-				headerStyle.Fill.SetPattern(DocumentFormat.OpenXml.Spreadsheet.PatternValues.Solid, Color.Black, Color.LightGray);
-				var headerItems = GetHeaderItems();
-				int col = 1;
-				foreach (var item in headerItems )
+				using (var excel = new SLDocument())
 				{
-					excel.SetCellValue(row, col, item.Title);
-					col++;
+					excel.RenameWorksheet("Sheet1", "CrawlResults");
+					var headerStyle = excel.CreateStyle();
+					headerStyle.Font.Bold = true;
+					headerStyle.Font.FontColor = Color.Black;
+					headerStyle.Fill.SetPattern(DocumentFormat.OpenXml.Spreadsheet.PatternValues.Solid, Color.LightGray, Color.White);
+					var headerItems = GetHeaderItems();
+					int col = 1;
+					foreach (var item in headerItems)
+					{
+						excel.SetCellValue(row, col, item.Title);
+						excel.SetCellStyle(row, col, headerStyle);
+						col++;
+					}
+					row++;
+					excel.SaveAs(file.FullName);
 				}
-				excel.SetRowStyle(row, headerStyle);
-				row++;
 			}
-			else
+
+			using (var excel = new SLDocument(file.FullName, "CrawlResults"))
 			{
-				excel = new SLDocument(file.FullName, "CrawlResults");
 				row = excel.GetWorksheetStatistics().EndRowIndex + 1;
-			}
 
-			foreach (var cp in results)
-			{
-				excel.SetCellValue(row, 1, cp.Url);
-				excel.SetCellValue(row, 2, cp.Referer);
-				excel.SetCellValue(row, 3, cp.Status);
-				excel.SetCellValue(row, 4, cp.TimeMiliseconds);
-				excel.SetCellValue(row, 5, cp.Size);
+				foreach (var cp in results)
+				{
+					int col = 1;
+					excel.SetCellValue(row, col++, cp.Url);
+					excel.SetCellValue(row, col++, cp.Referer);
+					excel.SetCellValue(row, col++, cp.Status);
+					excel.SetCellValue(row, col++, cp.TimeMiliseconds);
+					excel.SetCellValue(row, col++, cp.Size);
 
-				// PAGE INFO
-				excel.SetCellValue(row, 6, cp.PageInfo.Charset);
-				excel.SetCellValue(row, 7, cp.PageInfo.Lang);
+					// PAGE INFO
+					excel.SetCellValue(row, col++, cp.PageInfo.Charset);
+					excel.SetCellValue(row, col++, cp.PageInfo.Lang);
+					excel.SetCellValue(row, col++, cp.PageInfo.ContentType);
 
-				// SEO
-				excel.SetCellValue(row, 8, cp.Seo.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 9, cp.Seo.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 10, cp.Seo.Keywords?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					// SEO
+					excel.SetCellValue(row, col++, cp.Seo.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.Seo.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.Seo.Keywords?.Replace(Environment.NewLine, " ") ?? string.Empty);
 
-				// OPEN GRAPH
-				excel.SetCellValue(row, 11, cp.OpenGraph.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 12, cp.OpenGraph.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 13, cp.OpenGraph.Type?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 14, cp.OpenGraph.Url?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 15, cp.OpenGraph.Image?.Replace(Environment.NewLine, " ") ?? string.Empty);
-				excel.SetCellValue(row, 16, cp.OpenGraph.SiteName?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					// OPEN GRAPH
+					excel.SetCellValue(row, col++, cp.OpenGraph.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.OpenGraph.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.OpenGraph.Type?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.OpenGraph.Url?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.OpenGraph.Image?.Replace(Environment.NewLine, " ") ?? string.Empty);
+					excel.SetCellValue(row, col++, cp.OpenGraph.SiteName?.Replace(Environment.NewLine, " ") ?? string.Empty);
 
-				excel.SetCellValue(row, 17, cp.Error);
-				row++;
-			}
-			if (file.Exists)
-			{
+					excel.SetCellValue(row, col++, cp.Error);
+					row++;
+				}
 				excel.Save();
-			}
-			else
-			{
-				excel.SaveAs(file.FullName);
 			}
 		}
 
@@ -96,6 +95,7 @@ namespace Crawl2Excel.Engine.Code
 			// PAGE INFO
 			items.Add(new ExcelColumnInfo { Title = "Charset", Width = 100 });
 			items.Add(new ExcelColumnInfo { Title = "Lang", Width = 100 });
+			items.Add(new ExcelColumnInfo { Title = "ContentType", Width = 100 });
 
 			// SEO
 			items.Add(new ExcelColumnInfo { Title = "SeoTitle", AutoFit = true, AutoFitMinWidth = 10, AutoFitMaxWidth = 50 });

@@ -12,7 +12,7 @@ namespace Crawl2Excel.Engine.Code
 		private readonly Uri url;
 		private readonly FileInfo excelResult;
 		private PoliteWebCrawler? abot;
-		private List<CrawledPageResult> pages = new List<CrawledPageResult>();
+		private BlockingCollection<CrawledPageResult> pages = new BlockingCollection<CrawledPageResult>();
 		private ConcurrentDictionary<int, string> crawledPages = new ConcurrentDictionary<int, string>();
 
 		public CrawlerOptions Options { get; private set; } = new CrawlerOptions();
@@ -80,7 +80,7 @@ namespace Crawl2Excel.Engine.Code
 
 			if (pages.Any())
 			{
-				WriteResultsToExcel(pages);
+				WriteResultsToExcel(pages.ToList());
 			}
 		}
 
@@ -110,7 +110,8 @@ namespace Crawl2Excel.Engine.Code
 		{
 			if (e.CrawledPage != null)
 			{
-				Parallel.Invoke(() => StoreCrawlData(e.CrawledPage));
+				//Parallel.Invoke(() => StoreCrawlData(e.CrawledPage));
+				StoreCrawlData(e.CrawledPage);
 				lock (_consoleLock)
 				{
 					Console.SetCursorPosition(0, 2);
@@ -178,21 +179,29 @@ namespace Crawl2Excel.Engine.Code
 			AddCrawlResult(result);
 		}
 
-		private readonly object _flushLock = new object();
+		private static readonly object _flushLock = new object();
 		
 		private void AddCrawlResult(CrawledPageResult result)
 		{
 			pages.Add(result);
-			Console.SetCursorPosition(0, 3);
-			Console.WriteLine($"Pages in buffer: {pages.Count}");
+			lock (_consoleLock)
+			{
+				Console.SetCursorPosition(0, 3);
+				Console.WriteLine($"Pages in buffer: {pages.Count}    ");
+			}
 
 			lock (_flushLock)
 			{
-				if (pages.Count > 1000)
+				int takePages = 20;
+				if (pages.Count > takePages)
 				{
-					var storeResults = pages.ToList();
-					pages.Clear();
-					Parallel.Invoke(() => WriteResultsToExcel(storeResults));
+					var storeResults = new List<CrawledPageResult>();
+					for (int i = 0; i < takePages; i++)
+					{
+						storeResults.Add(pages.Take());
+					}
+					//Parallel.Invoke(() => WriteResultsToExcel(storeResults));
+					WriteResultsToExcel(storeResults);
 				}
 			}
 		}
