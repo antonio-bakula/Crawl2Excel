@@ -1,12 +1,6 @@
-﻿using Abot2.Poco;
-using Crawl2Excel.Engine.Models;
-using SpreadsheetLight;
+﻿using Crawl2Excel.Engine.Models;
+using OfficeOpenXml;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Crawl2Excel.Engine.Code
 {
@@ -22,64 +16,74 @@ namespace Crawl2Excel.Engine.Code
 		public void WriteResults(List<CrawledPageResult> results)
 		{
 			int row = 1;
-			file.Refresh();
-			if (!file.Exists)
+			int col = 1;
+			if (!File.Exists(file.FullName))
 			{
-				using (var excel = new SLDocument())
+				using (var pack = new ExcelPackage())
 				{
-					excel.RenameWorksheet("Sheet1", "CrawlResults");
-					var headerStyle = excel.CreateStyle();
-					headerStyle.Font.Bold = true;
-					headerStyle.Font.FontColor = Color.Black;
-					headerStyle.Fill.SetPattern(DocumentFormat.OpenXml.Spreadsheet.PatternValues.Solid, Color.LightGray, Color.White);
-					var headerItems = GetHeaderItems();
-					int col = 1;
-					foreach (var item in headerItems)
+					var ws = pack.Workbook.Worksheets.Add("CrawlResults");
+					var headers = GetHeaderItems();
+					col = 1;
+					foreach (var header in headers)
 					{
-						excel.SetCellValue(row, col, item.Title);
-						excel.SetCellStyle(row, col, headerStyle);
+						ws.Cells[row, col].Style.Font.Bold = true;
+						ws.Cells[row, col].Style.Fill.PatternType = OfficeOpenXml.Style.ExcelFillStyle.Solid;
+						ws.Cells[row, col].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.LightGray);
+						ws.Cells[row, col].Style.HorizontalAlignment = OfficeOpenXml.Style.ExcelHorizontalAlignment.Center;
+						ws.Cells[row, col].Value = header.Title;
 						col++;
 					}
-					row++;
-					excel.SaveAs(file.FullName);
+					pack.SaveAs(file);
 				}
 			}
 
-			using (var excel = new SLDocument(file.FullName, "CrawlResults"))
+			using (var pack = new ExcelPackage(file))
 			{
-				row = excel.GetWorksheetStatistics().EndRowIndex + 1;
-
+				var ws = pack.Workbook.Worksheets["CrawlResults"];
+				row = ws.Dimension.End.Row + 1;
 				foreach (var cp in results)
 				{
-					int col = 1;
-					excel.SetCellValue(row, col++, cp.Url);
-					excel.SetCellValue(row, col++, cp.Referer);
-					excel.SetCellValue(row, col++, cp.Status);
-					excel.SetCellValue(row, col++, cp.TimeMiliseconds);
-					excel.SetCellValue(row, col++, cp.Size);
-
-					// PAGE INFO
-					excel.SetCellValue(row, col++, cp.PageInfo.Charset);
-					excel.SetCellValue(row, col++, cp.PageInfo.Lang);
-					excel.SetCellValue(row, col++, cp.PageInfo.ContentType);
-
-					// SEO
-					excel.SetCellValue(row, col++, cp.Seo.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.Seo.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.Seo.Keywords?.Replace(Environment.NewLine, " ") ?? string.Empty);
-
-					// OPEN GRAPH
-					excel.SetCellValue(row, col++, cp.OpenGraph.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.OpenGraph.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.OpenGraph.Type?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.OpenGraph.Url?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.OpenGraph.Image?.Replace(Environment.NewLine, " ") ?? string.Empty);
-					excel.SetCellValue(row, col++, cp.OpenGraph.SiteName?.Replace(Environment.NewLine, " ") ?? string.Empty);
-
-					excel.SetCellValue(row, col++, cp.Error);
+					col = 1;
+					foreach (var value in GetDataItems(cp))
+					{
+						ws.Cells[row, col].Value = value;
+						col++;
+					}
 					row++;
 				}
-				excel.Save();
+
+				var headers = GetHeaderItems();
+				col = 1;
+				foreach (var header in headers)
+				{
+					if (header.AutoFit)
+					{
+						if (header.AutoFitMinWidth.HasValue && header.AutoFitMaxWidth.HasValue)
+						{
+							ws.Column(col).AutoFit(header.AutoFitMinWidth.Value, header.AutoFitMaxWidth.Value);
+						}
+						else if (header.AutoFitMinWidth.HasValue)
+						{
+							ws.Column(col).AutoFit(header.AutoFitMinWidth.Value);
+						}
+						else
+						{
+							ws.Column(col).AutoFit();
+						}
+					}
+					else if (header.Width.HasValue)
+					{
+						ws.Column(col).Width = header.Width.Value;
+					}
+
+					if (!string.IsNullOrEmpty(header.NumberFormat))
+					{
+						ws.Column(col).Style.Numberformat.Format = header.NumberFormat;
+					}
+					col++;
+				}
+				ws.View.FreezePanes(2, 1);
+				pack.Save();
 			}
 		}
 
@@ -93,9 +97,9 @@ namespace Crawl2Excel.Engine.Code
 			items.Add(new ExcelColumnInfo { Title = "Size (bytes)", AutoFit = true, NumberFormat = "#,##0" });
 
 			// PAGE INFO
-			items.Add(new ExcelColumnInfo { Title = "Charset", Width = 100 });
-			items.Add(new ExcelColumnInfo { Title = "Lang", Width = 100 });
-			items.Add(new ExcelColumnInfo { Title = "ContentType", Width = 100 });
+			items.Add(new ExcelColumnInfo { Title = "Charset", AutoFit = true, AutoFitMinWidth = 10, AutoFitMaxWidth = 30 });
+			items.Add(new ExcelColumnInfo { Title = "Lang", AutoFit = true, AutoFitMinWidth = 10, AutoFitMaxWidth = 30 });
+			items.Add(new ExcelColumnInfo { Title = "ContentType", AutoFit = true, AutoFitMinWidth = 10, AutoFitMaxWidth = 32 });
 
 			// SEO
 			items.Add(new ExcelColumnInfo { Title = "SeoTitle", AutoFit = true, AutoFitMinWidth = 10, AutoFitMaxWidth = 50 });
@@ -113,6 +117,38 @@ namespace Crawl2Excel.Engine.Code
 			items.Add(new ExcelColumnInfo { Title = "Error", AutoFit = true });
 			return items;
 		}
+
+		private List<object?> GetDataItems(CrawledPageResult cp)
+		{
+			var items = new List<object?>();
+			items.Add(cp.Url);
+			items.Add(cp.Referer);
+			items.Add(cp.Status);
+			items.Add(cp.TimeMiliseconds);
+			items.Add(cp.Size);
+
+			// PAGE INFO
+			items.Add(cp.PageInfo.Charset);
+			items.Add(cp.PageInfo.Lang);
+			items.Add(cp.PageInfo.ContentType);
+				
+			// SEO
+			items.Add(cp.Seo.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.Seo.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.Seo.Keywords?.Replace(Environment.NewLine, " ") ?? string.Empty);
+				
+			// OPEN GRAPH
+			items.Add(cp.OpenGraph.Title?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.OpenGraph.Description?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.OpenGraph.Type?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.OpenGraph.Url?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.OpenGraph.Image?.Replace(Environment.NewLine, " ") ?? string.Empty);
+			items.Add(cp.OpenGraph.SiteName?.Replace(Environment.NewLine, " ") ?? string.Empty);
+
+			items.Add(cp.Error);
+			return items;
+		}
+
 
 	}
 
