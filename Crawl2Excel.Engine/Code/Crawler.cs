@@ -154,8 +154,11 @@ namespace Crawl2Excel.Engine.Code
 
 				var infoWorker = new PageInfoWorker(crawledPage);
 				result.PageInfo = infoWorker.GetInfo();
-				result.Seo = infoWorker.GetSeoData();
-				result.OpenGraph = infoWorker.GetOpenGraphData();
+				if (result.PageInfo.IsHtml)
+				{
+					result.Seo = infoWorker.GetSeoData();
+					result.OpenGraph = infoWorker.GetOpenGraphData();
+				}
 			}
 			else
 			{

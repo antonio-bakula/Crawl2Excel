@@ -17,9 +17,18 @@ namespace Crawl2Excel.Engine.Code
 		public PageInfo GetInfo()
 		{
 			var info = new PageInfo();
-			info.Charset = page.AngleSharpHtmlDocument.CharacterSet;
-			info.Lang = page.AngleSharpHtmlDocument.Head.Language;
-			info.ContentType = page.AngleSharpHtmlDocument.ContentType;
+			info.ContentType = page.HttpResponseMessage?.Content?.Headers?.ContentType?.MediaType ?? "";
+
+			if (info.IsHtml)
+			{
+				info.Charset = page.AngleSharpHtmlDocument.CharacterSet;
+				info.Lang = page.AngleSharpHtmlDocument.Head.Language;
+			}
+			else
+			{
+				info.Charset = page.HttpResponseMessage?.Content?.Headers?.ContentType?.CharSet;
+				info.Lang = string.Join(",", page.HttpResponseMessage?.Content?.Headers?.ContentLanguage ?? new List<string>()); 
+			}
 			return info;
 		}
 

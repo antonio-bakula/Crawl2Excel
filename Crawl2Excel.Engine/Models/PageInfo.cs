@@ -5,6 +5,7 @@ namespace Crawl2Excel.Engine.Models
 
 	public class PageInfo
 	{
+		public bool IsHtml => this.ContentType?.ToLower().Contains("html") ?? false;
 		public string? Charset { get; set; }
 		public string? Lang { get; set; }
 		public string? ContentType { get; set; }
