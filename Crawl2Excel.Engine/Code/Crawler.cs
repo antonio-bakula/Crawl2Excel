@@ -1,9 +1,15 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
+using System.Security;
+using System.Text;
+using System.Threading;
 using Abot2.Crawler;
 using Abot2.Poco;
+using AngleSharp.Io;
 using Crawl2Excel.Engine.Models;
+using ExCSS;
 
 namespace Crawl2Excel.Engine.Code
 {
@@ -14,11 +20,12 @@ namespace Crawl2Excel.Engine.Code
 		private PoliteWebCrawler? abot;
 		private BlockingCollection<CrawledPageResult> pages = new BlockingCollection<CrawledPageResult>();
 		private ConcurrentDictionary<int, string> crawledPages = new ConcurrentDictionary<int, string>();
+		private List<ParsedLink> innerLinks = new List<ParsedLink>();
 
 		public CrawlerOptions Options { get; private set; } = new CrawlerOptions();
 		public CrawlResult Result { get; private set; } = new CrawlResult();
 
-		public Crawler(string startUrl, string? resultExcelFile)
+		public Crawler(string startUrl, string resultExcelFile)
 		{
 			url = new Uri(startUrl);
 			if (!string.IsNullOrEmpty(resultExcelFile)) 
@@ -33,12 +40,15 @@ namespace Crawl2Excel.Engine.Code
 
 		public async Task Start()
 		{
+			var textContentTypes = "text/html,text/plain,text/csv,text/xml";
+			var appContentTypes = "application/pdf,application/msword,application/vnd.ms-excel,application/vnd.ms-powerpoint,application/octet-stream,application/json,application/rtf,application/xhtml+xml,application/xml,application/zip";
 			var config = new CrawlConfiguration
 			{
 				MaxPagesToCrawl = 10000,
 				IsExternalPageCrawlingEnabled = false,
 				IsExternalPageLinksCrawlingEnabled = false,
-				HttpRequestTimeoutInSeconds = 600
+				HttpRequestTimeoutInSeconds = 600,
+				DownloadableContentTypes = $"{textContentTypes},{appContentTypes}"
 			};
 
 			if (excelResult.Exists)
@@ -78,13 +88,25 @@ namespace Crawl2Excel.Engine.Code
 			Console.WriteLine("Crawling: " + url.ToString());
 			Result = await crawler.CrawlAsync(url);
 
+			await FetchAndParseInnerLinks(url);
+
 			if (pages.Any())
 			{
 				WriteResultsToExcel(pages.ToList());
 			}
 		}
 
-		private void Crawler_PageCrawlDisallowed(object? sender, PageCrawlDisallowedArgs e)
+		private readonly object displayLock = new object();
+		private void DisplayCurrentCrawledPagesCount()
+		{
+			lock (displayLock)
+			{
+				Console.SetCursorPosition(0, 2);
+				Console.WriteLine($"Pages Crawled: {pages.Count}");
+			}
+		}
+
+		private void Crawler_PageCrawlDisallowed(object sender, PageCrawlDisallowedArgs e)
 		{
 			var ignoreReasons = new List<string> {
 				"data:application",
@@ -105,24 +127,21 @@ namespace Crawl2Excel.Engine.Code
 			AddCrawlResult(result);
 		}
 
-		private void Crawler_PageCrawlCompleted(object? sender, PageCrawlCompletedArgs e)
+		private void Crawler_PageCrawlCompleted(object sender, PageCrawlCompletedArgs e)
 		{
 			if (e.CrawledPage != null)
 			{
-				//Parallel.Invoke(() => StoreCrawlData(e.CrawledPage));
 				StoreCrawlData(e.CrawledPage);
-				Console.SetCursorPosition(0, 2);
-				Console.WriteLine($"Pages Crawled: {crawledPages.Count}");
 			}
 		}
 
-		private void Crawler_PageCrawlStarting(object? sender, PageCrawlStartingArgs e)
+		private void Crawler_PageCrawlStarting(object sender, PageCrawlStartingArgs e)
 		{
 		}
 
 		private void StoreCrawlData(CrawledPage crawledPage, string error = "")
 		{
-			string? url = crawledPage.Uri?.ToString()?.ToLower();
+			string url = crawledPage.Uri?.ToString()?.ToLower();
 			if (string.IsNullOrEmpty(url))
 			{
 				return;
@@ -176,12 +195,76 @@ namespace Crawl2Excel.Engine.Code
 			}
 			
 			AddCrawlResult(result);
+
+			var contentParser = new HtmlContentParser(crawledPage);
+			contentParser.ParseContent();
+			innerLinks.AddRange(contentParser.ParsedLinks);
+		}
+
+		private async Task FetchAndParseInnerLinks(Uri rootUri)
+		{
+			var allreadyParsed = new HashSet<string>();
+
+			foreach (var link in innerLinks)
+			{				
+				var linkUri = new Uri(rootUri.Scheme + "://" + link.Url.Replace("http://", "").Replace("https://", ""));
+				string sameSchemeUrl = linkUri.GetLeftPart(UriPartial.Path);
+
+				if (!allreadyParsed.Contains(sameSchemeUrl) && !string.IsNullOrEmpty(linkUri.LocalPath) && linkUri.LocalPath != "/")
+				{
+					allreadyParsed.Add(sameSchemeUrl);
+
+					var result = new CrawledPageResult();
+					result.Url = sameSchemeUrl;
+					result.Referer = link.Referer;
+					result.PageInfo.ContentType = link.ContentType;
+
+					var content = await DownloadFileAndFilResult(link.Url, result);
+
+					// TODO: CSS parser baca errore, treba ga zamijeniti
+					// parsam CSS datoteke i izvlačim sve url-ove
+					if (link.ContentType == MimeTypeNames.Css && content.Length > 0)
+					{
+						//string cssContent = Encoding.UTF8.GetString(content);
+						//var parser = new StylesheetParser();
+						//var css = parser.Parse(cssContent);
+					}
+
+					AddCrawlResult(result);
+				}
+			}
+		}
+
+		private async Task<byte[]> DownloadFileAndFilResult(string url, CrawledPageResult result)
+		{
+			using (var client = new HttpClient())
+			{
+				try
+				{
+					var sw = new Stopwatch();
+					sw.Start();
+					var content = await client.GetAsync(url);
+					var data = await content.Content.ReadAsByteArrayAsync();
+					sw.Stop();
+
+					result.Status = (int)content.StatusCode;
+					result.TimeMiliseconds = sw.ElapsedMilliseconds;
+					result.Size = data.Length;
+					return data;
+				}
+				catch (Exception ex)
+				{
+					result.Error = ex.Message;
+					return new byte[0];
+				}
+
+			}
 		}
 
 		private void AddCrawlResult(CrawledPageResult result)
 		{
 			pages.Add(result);
-
+			DisplayCurrentCrawledPagesCount();
 			int takePages = 1000;
 			if (pages.Count > takePages)
 			{
