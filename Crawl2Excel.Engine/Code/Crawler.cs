@@ -221,6 +221,7 @@ namespace Crawl2Excel.Engine.Code
 
 					var content = await DownloadFileAndFilResult(link.Url, result);
 
+					// TODO: CSS parser baca errore, treba ga zamijeniti
 					// parsam CSS datoteke i izvlačim sve url-ove
 					if (link.ContentType == MimeTypeNames.Css && content.Length > 0)
 					{
