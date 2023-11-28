@@ -10,6 +10,7 @@ using Abot2.Poco;
 using AngleSharp.Io;
 using Crawl2Excel.Engine.Models;
 using ExCSS;
+using Microsoft.Extensions.Logging;
 
 namespace Crawl2Excel.Engine.Code
 {
@@ -219,7 +220,22 @@ namespace Crawl2Excel.Engine.Code
 					result.Referer = link.Referer;
 					result.PageInfo.ContentType = link.ContentType;
 
-					var content = await DownloadFileAndFilResult(link.Url, result);
+					byte[] content = new byte[0];
+					for (int i = 0; i < 3; i++)
+					{
+						content = await DownloadFileAndFilResult(link.Url, result);
+						if (content.Length > 0)
+						{
+							break;
+						}
+
+						Crawl2ExcelLogger.Logger.LogError($"Error downloading file: {link.Url}, status: {result.Status}, Error: {result.Error}");
+						if (result.Status == 503)
+						{
+							Crawl2ExcelLogger.Logger.LogInformation($"Waiting 2 seconds and trying again for url: {link.Url}");
+							Thread.Sleep(2000);
+						}
+					}
 
 					// TODO: CSS parser baca errore, treba ga zamijeniti
 					// parsam CSS datoteke i izvlačim sve url-ove
