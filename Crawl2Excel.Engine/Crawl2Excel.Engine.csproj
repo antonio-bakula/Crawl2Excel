@@ -10,6 +10,9 @@
     <PackageReference Include="Abot" Version="2.0.70" />
     <PackageReference Include="EPPlusFree" Version="4.5.3.8" />
     <PackageReference Include="ExCSS" Version="4.2.2" />
+    <PackageReference Include="Karambolo.Extensions.Logging.File" Version="3.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
     <PackageReference Include="MimeTypesMap" Version="1.0.8" />
   </ItemGroup>
 
