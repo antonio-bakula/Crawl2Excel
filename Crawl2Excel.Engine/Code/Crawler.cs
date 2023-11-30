@@ -230,7 +230,8 @@ namespace Crawl2Excel.Engine.Code
 						}
 
 						Crawl2ExcelLogger.Logger.LogError($"Error downloading file: {link.Url}, status: {result.Status}, Error: {result.Error}");
-						if (result.Status == 503)
+						// retrying gateway errors
+						if (result.Status == 503 || result.Status == 502 || result.Status == 503)
 						{
 							Crawl2ExcelLogger.Logger.LogInformation($"Waiting 2 seconds and trying again for url: {link.Url}");
 							Thread.Sleep(2000);
