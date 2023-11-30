@@ -22,7 +22,7 @@ namespace Crawl2Excel.Engine.Code
 		private BlockingCollection<CrawledPageResult> pages = new BlockingCollection<CrawledPageResult>();
 		private ConcurrentDictionary<int, string> crawledPages = new ConcurrentDictionary<int, string>();
 		private List<ParsedLink> innerLinks = new List<ParsedLink>();
-
+		
 		public CrawlerOptions Options { get; private set; } = new CrawlerOptions();
 		public CrawlResult Result { get; private set; } = new CrawlResult();
 
@@ -103,7 +103,7 @@ namespace Crawl2Excel.Engine.Code
 			lock (displayLock)
 			{
 				Console.SetCursorPosition(0, 2);
-				Console.WriteLine($"Pages Crawled: {pages.Count}");
+				Console.WriteLine($"Pages Crawled: {crawledPages.Count}   ");
 			}
 		}
 
