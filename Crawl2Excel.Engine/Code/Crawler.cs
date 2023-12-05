@@ -267,11 +267,15 @@ namespace Crawl2Excel.Engine.Code
 
 						if (pc.CharacterCategorisation == CharacterCategorisationOptions.Value && srcProperyIndex != -1 && pc.IndexInSource > srcProperyIndex && pc.Value != null)
 						{
-							// url value = url("/assets/FontAwesome/webfonts/fa-brands-400.eot?")
+							// može biti full url ili relativni, ali može početi i sa ../
+							// primjeri:
+							// local(""),url("../font/roboto-slab-v13-latin-ext_latin-300.woff2")
+							// url("/assets/FontAwesome/webfonts/fa-brands-400.eot?")
+
+							// TODO: ovo je privremeno i nedovoljno dobro
 							string url = pc.Value.Trim().Replace("url(\"", "").Replace("\")", "");
 							if (DecideToCrawlUrl(url).Allow)
 							{
-								// može biti full url ili relativni, ali može početi i sa ../
 								Crawl2ExcelLogger.Logger.LogInformation($"Found css src url: {pc.Value.Trim()}, clean url extracted: {url}");
 							}
 							srcProperyIndex = -1;
