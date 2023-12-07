@@ -9,7 +9,8 @@ using Abot2.Crawler;
 using Abot2.Poco;
 using AngleSharp.Io;
 using Crawl2Excel.Engine.Models;
-using ExCSS;
+using CSSParser;
+using CSSParser.ContentProcessors;
 using Microsoft.Extensions.Logging;
 
 namespace Crawl2Excel.Engine.Code
@@ -22,6 +23,7 @@ namespace Crawl2Excel.Engine.Code
 		private BlockingCollection<CrawledPageResult> pages = new BlockingCollection<CrawledPageResult>();
 		private ConcurrentDictionary<int, string> crawledPages = new ConcurrentDictionary<int, string>();
 		private List<ParsedLink> innerLinks = new List<ParsedLink>();
+		private int crawledPagesCount = 0;
 		
 		public CrawlerOptions Options { get; private set; } = new CrawlerOptions();
 		public CrawlResult Result { get; private set; } = new CrawlResult();
@@ -49,7 +51,7 @@ namespace Crawl2Excel.Engine.Code
 				IsExternalPageCrawlingEnabled = false,
 				IsExternalPageLinksCrawlingEnabled = false,
 				HttpRequestTimeoutInSeconds = 600,
-				DownloadableContentTypes = $"{textContentTypes},{appContentTypes}"
+				DownloadableContentTypes = $"{textContentTypes},{appContentTypes}",			
 			};
 
 			if (excelResult.Exists)
@@ -70,19 +72,7 @@ namespace Crawl2Excel.Engine.Code
 			crawler.PageCrawlDisallowed += Crawler_PageCrawlDisallowed;
 			crawler.ShouldCrawlPageDecisionMaker = (page, ctx) =>
 			{
-				/// don't wont data:application URIs
-				if ((page?.Uri?.LocalPath ?? "").ToLower().Contains($"data:application/"))
-				{
-					return new CrawlDecision { Allow = false, Reason = "data:application" };
-				}
-
-				/// don't wont data:image URIs
-				if ((page?.Uri?.LocalPath ?? "").ToLower().Contains($"data:image/"))
-				{
-					return new CrawlDecision { Allow = false, Reason = "data:image" };
-				}
-
-				return new CrawlDecision { Allow = true };
+				return DecideToCrawlUrl(page?.Uri?.LocalPath);
 			};
 
 			Console.Clear();
@@ -103,8 +93,25 @@ namespace Crawl2Excel.Engine.Code
 			lock (displayLock)
 			{
 				Console.SetCursorPosition(0, 2);
-				Console.WriteLine($"Pages Crawled: {crawledPages.Count}   ");
+				Console.WriteLine($"Pages Crawled: {crawledPagesCount}   ");
 			}
+		}
+
+		private CrawlDecision DecideToCrawlUrl(string url)
+		{
+			// don't wont data:application URIs
+			if ((url ?? "").ToLower().Contains($"data:application/"))
+			{
+				return new CrawlDecision { Allow = false, Reason = "data:application" };
+			}
+
+			// don't wont data:image URIs
+			if ((url ?? "").ToLower().Contains($"data:image/"))
+			{
+				return new CrawlDecision { Allow = false, Reason = "data:image" };
+			}
+
+			return new CrawlDecision { Allow = true };
 		}
 
 		private void Crawler_PageCrawlDisallowed(object sender, PageCrawlDisallowedArgs e)
@@ -207,48 +214,105 @@ namespace Crawl2Excel.Engine.Code
 			var allreadyParsed = new HashSet<string>();
 
 			foreach (var link in innerLinks)
-			{				
-				var linkUri = new Uri(rootUri.Scheme + "://" + link.Url.Replace("http://", "").Replace("https://", ""));
-				string sameSchemeUrl = linkUri.GetLeftPart(UriPartial.Path);
-
-				if (!allreadyParsed.Contains(sameSchemeUrl) && !string.IsNullOrEmpty(linkUri.LocalPath) && linkUri.LocalPath != "/")
+			{
+				try
 				{
-					allreadyParsed.Add(sameSchemeUrl);
-
-					var result = new CrawledPageResult();
-					result.Url = sameSchemeUrl;
-					result.Referer = link.Referer;
-					result.PageInfo.ContentType = link.ContentType;
-
-					byte[] content = new byte[0];
-					for (int i = 0; i < 3; i++)
-					{
-						content = await DownloadFileAndFilResult(link.Url, result);
-						if (content.Length > 0)
-						{
-							break;
-						}
-
-						Crawl2ExcelLogger.Logger.LogError($"Error downloading file: {link.Url}, status: {result.Status}, Error: {result.Error}");
-						// retrying gateway errors
-						if (result.Status == 503 || result.Status == 502 || result.Status == 503)
-						{
-							Crawl2ExcelLogger.Logger.LogInformation($"Waiting 2 seconds and trying again for url: {link.Url}");
-							Thread.Sleep(2000);
-						}
-					}
-
-					// TODO: CSS parser baca errore, treba ga zamijeniti
-					// parsam CSS datoteke i izvlačim sve url-ove
-					if (link.ContentType == MimeTypeNames.Css && content.Length > 0)
-					{
-						//string cssContent = Encoding.UTF8.GetString(content);
-						//var parser = new StylesheetParser();
-						//var css = parser.Parse(cssContent);
-					}
-
-					AddCrawlResult(result);
+					await ProcessInnerLink(rootUri, allreadyParsed, link);
 				}
+				catch (Exception ex)
+				{
+					Crawl2ExcelLogger.Logger.LogError(ex, $"Error processing inner link: {link.Url}");
+				}
+			}
+		}
+
+		private async Task ProcessInnerLink(Uri rootUri, HashSet<string> allreadyParsed, ParsedLink link)
+		{
+			var linkUri = new Uri(rootUri.Scheme + "://" + link.Url.Replace("http://", "").Replace("https://", ""));
+			string sameSchemeUrl = linkUri.GetLeftPart(UriPartial.Path);
+
+			if (!allreadyParsed.Contains(sameSchemeUrl) && !string.IsNullOrEmpty(linkUri.LocalPath) && linkUri.LocalPath != "/")
+			{
+				allreadyParsed.Add(sameSchemeUrl);
+
+				var result = new CrawledPageResult();
+				result.Url = sameSchemeUrl;
+				result.Referer = link.Referer;
+				result.PageInfo.ContentType = link.ContentType;
+
+				byte[] content = new byte[0];
+				for (int i = 0; i < 3; i++)
+				{
+					content = await DownloadFileAndFilResult(link.Url, result);
+					if (content.Length > 0)
+					{
+						break;
+					}
+
+					Crawl2ExcelLogger.Logger.LogError($"Error downloading file: {link.Url}, status: {result.Status}, Error: {result.Error}");
+					// retrying gateway errors
+					if (result.Status == 503 || result.Status == 502 || result.Status == 503)
+					{
+						Crawl2ExcelLogger.Logger.LogInformation($"Waiting 2 seconds and trying again for url: {link.Url}");
+						Thread.Sleep(2000);
+					}
+				}
+
+				// parsam CSS datoteke i izvlačim sve url-ove
+				if (link.ContentType == MimeTypeNames.Css && content.Length > 0)
+				{
+					string cssContent = Encoding.UTF8.GetString(content);
+
+					var parsedCss = Parser.ParseCSS(cssContent);
+					int srcProperyIndex = -1;
+					foreach (var pc in parsedCss)
+					{
+						if (pc.CharacterCategorisation == CharacterCategorisationOptions.SelectorOrStyleProperty && pc.Value == "src")
+						{
+							srcProperyIndex = pc.IndexInSource;
+						}
+
+						if (pc.CharacterCategorisation == CharacterCategorisationOptions.Value && srcProperyIndex != -1 && pc.IndexInSource > srcProperyIndex && pc.Value != null)
+						{
+							// primjeri:
+							// local(""),url("../font/roboto-slab-v13-latin-ext_latin-300.woff2"),url("../font/roboto-slab-v13-latin-ext_latin-400.woff2")
+							// url("/assets/FontAwesome/webfonts/fa-brands-400.eot?")
+
+							var parts = pc.Value.Trim().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Where(p => p.Contains("url(\"")); // samo one koji imaju url
+							foreach (var part in parts) 
+							{
+								string url = part.Trim().Replace("url(\"", "").Replace("\")", "");
+								// može biti full url ili relativni, ali može početi i sa ../
+								if (url.StartsWith("../"))
+								{
+									string filename = Path.GetFileName(link.Url);
+									url = link.Url.Replace(filename, "") + url;
+								}
+								else if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+								{
+									var parentUri = new Uri(link.Url);
+									url = parentUri.GetLeftPart(UriPartial.Authority) + url;
+								}
+								if (DecideToCrawlUrl(url).Allow)
+								{
+									Crawl2ExcelLogger.Logger.LogInformation($"Found css src url: {part.Trim()}, clean url extracted: {url}");
+									var parsedLink = new ParsedLink(url, link.Url);
+									try
+									{
+										await ProcessInnerLink(rootUri, allreadyParsed, parsedLink);
+									}
+									catch (Exception ex)
+									{
+										Crawl2ExcelLogger.Logger.LogError(ex, $"Error processing inner link: {link.Url}");
+									}
+								}
+							}
+							srcProperyIndex = -1;
+						}
+					}
+				}
+
+				AddCrawlResult(result);
 			}
 		}
 
@@ -281,6 +345,7 @@ namespace Crawl2Excel.Engine.Code
 		private void AddCrawlResult(CrawledPageResult result)
 		{
 			pages.Add(result);
+			crawledPagesCount++;
 			DisplayCurrentCrawledPagesCount();
 			int takePages = 1000;
 			if (pages.Count > takePages)
