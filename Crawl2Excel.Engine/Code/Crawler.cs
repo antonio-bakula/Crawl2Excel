@@ -215,7 +215,14 @@ namespace Crawl2Excel.Engine.Code
 
 			foreach (var link in innerLinks)
 			{
-				await ProcessInnerLink(rootUri, allreadyParsed, link);
+				try
+				{
+					await ProcessInnerLink(rootUri, allreadyParsed, link);
+				}
+				catch (Exception ex)
+				{
+					Crawl2ExcelLogger.Logger.LogError(ex, $"Error processing inner link: {link.Url}");
+				}
 			}
 		}
 
@@ -267,16 +274,38 @@ namespace Crawl2Excel.Engine.Code
 
 						if (pc.CharacterCategorisation == CharacterCategorisationOptions.Value && srcProperyIndex != -1 && pc.IndexInSource > srcProperyIndex && pc.Value != null)
 						{
-							// može biti full url ili relativni, ali može početi i sa ../
 							// primjeri:
-							// local(""),url("../font/roboto-slab-v13-latin-ext_latin-300.woff2")
+							// local(""),url("../font/roboto-slab-v13-latin-ext_latin-300.woff2"),url("../font/roboto-slab-v13-latin-ext_latin-400.woff2")
 							// url("/assets/FontAwesome/webfonts/fa-brands-400.eot?")
 
-							// TODO: ovo je privremeno i nedovoljno dobro
-							string url = pc.Value.Trim().Replace("url(\"", "").Replace("\")", "");
-							if (DecideToCrawlUrl(url).Allow)
+							var parts = pc.Value.Trim().Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Where(p => p.Contains("url(\"")); // samo one koji imaju url
+							foreach (var part in parts) 
 							{
-								Crawl2ExcelLogger.Logger.LogInformation($"Found css src url: {pc.Value.Trim()}, clean url extracted: {url}");
+								string url = part.Trim().Replace("url(\"", "").Replace("\")", "");
+								// može biti full url ili relativni, ali može početi i sa ../
+								if (url.StartsWith("../"))
+								{
+									string filename = Path.GetFileName(link.Url);
+									url = link.Url.Replace(filename, "") + url;
+								}
+								else if (!url.StartsWith("http://") && !url.StartsWith("https://"))
+								{
+									var parentUri = new Uri(link.Url);
+									url = parentUri.GetLeftPart(UriPartial.Authority) + url;
+								}
+								if (DecideToCrawlUrl(url).Allow)
+								{
+									Crawl2ExcelLogger.Logger.LogInformation($"Found css src url: {part.Trim()}, clean url extracted: {url}");
+									var parsedLink = new ParsedLink(url, link.Url);
+									try
+									{
+										await ProcessInnerLink(rootUri, allreadyParsed, parsedLink);
+									}
+									catch (Exception ex)
+									{
+										Crawl2ExcelLogger.Logger.LogError(ex, $"Error processing inner link: {link.Url}");
+									}
+								}
 							}
 							srcProperyIndex = -1;
 						}
